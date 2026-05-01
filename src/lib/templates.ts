@@ -47,8 +47,7 @@ export const DEFAULT_3D_GAME = `<!DOCTYPE html>
     dirLight.shadow.camera.right = 20;
     dirLight.shadow.camera.top = 20;
     dirLight.shadow.camera.bottom = -20;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
+    dirLight.shadow.mapSize.set(1024, 1024);
     scene.add(dirLight);
 
     // Ground Physics & Graphics

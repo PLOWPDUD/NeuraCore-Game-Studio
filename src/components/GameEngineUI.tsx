@@ -86,13 +86,28 @@ export function GameEngineUI() {
   };
 
   const getProcessedCode = (rawCode: string) => {
+    // Auto-fix the mapSize property bug that might be saved in user's state
+    let fixedCode = rawCode
+      .replace(/dirLight\.shadow\.mapSize\.width\s*=\s*1024;\s*dirLight\.shadow\.mapSize\.height\s*=\s*1024;/g, 'dirLight.shadow.mapSize.set(1024, 1024);')
+      .replace(/dirLight\.shadow\.mapSize\.width\s*=/g, '// mapSize.width =')
+      .replace(/dirLight\.shadow\.mapSize\.height\s*=/g, '// mapSize.height =');
+
     const errorScript = `<script>
       (function() {
         const methods = ['log', 'error', 'warn', 'info'];
         methods.forEach(method => {
           const original = console[method];
           console[method] = function(...args) {
-            const payload = args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ');
+            const payload = args.map(a => {
+              if (typeof a === 'object') {
+                try {
+                  return JSON.stringify(a);
+                } catch (e) {
+                  return String(a) + ' [Object]';
+                }
+              }
+              return String(a);
+            }).join(' ');
             window.parent.postMessage({ type: 'CONSOLE_MSG', level: method, payload }, '*');
             if (original) original.apply(console, args);
           };
@@ -108,10 +123,10 @@ export function GameEngineUI() {
       })();
     </script>`;
     
-    if (rawCode.includes('<head>')) {
-      return rawCode.replace('<head>', '<head>' + errorScript);
+    if (fixedCode.includes('<head>')) {
+      return fixedCode.replace('<head>', '<head>' + errorScript);
     }
-    return errorScript + rawCode;
+    return errorScript + fixedCode;
   };
 
   const [homeName, setHomeName] = useState('');
