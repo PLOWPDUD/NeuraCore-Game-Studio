@@ -16,6 +16,11 @@ CRITICAL INSTRUCTIONS:
 - For 2D Physics interactions, use Matter.js included via CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
 - Ensure the game scales well to the window viewport (window.innerWidth/innerHeight).
 
+ADVANCED QUALITY & ARCHITECTURE:
+- Take your time to think and plan thoroughly before writing code.
+- You MUST include rich, high-quality details (like particle systems, post-processing, screen shakes, satisfying animations, polished UI, lighting optimizations) even for small requests. Make it a premium experience.
+- Structure your code gracefully using Data-Driven Design. Embed JSON-like config objects DIRECTLY inside the JS '<script>' tag within the HTML file to define scenes, levels, entities, and configurations (e.g., \`const gameData = { scenes: { ... }, levels: [...] };\`). DO NOT create separate JSON files. The entire game MUST be contained within the single HTML output.
+
 Always make the games visually impressive with dark themes or vibrant colors, shadow mapping in 3D, and smooth controls.`;
 
 export async function generateGameCode(prompt: string, currentCode?: string) {
@@ -29,7 +34,7 @@ export async function generateGameCode(prompt: string, currentCode?: string) {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: 'gemini-2.5-pro',
       contents: fullPrompt,
       config: {
         systemInstruction: SYSTEM_PROMPT,
@@ -39,14 +44,20 @@ export async function generateGameCode(prompt: string, currentCode?: string) {
 
     const text = response.text || '';
     
-    // Extract HTML from markdown (more robust regex for optional language tag)
-    const htmlMatch = text.match(/\`\`\`(?:html)?\s*\n([\s\S]*?)\`\`\`/i);
+    let finalCode = text.trim();
+    const docMatch = finalCode.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
+    if (docMatch && docMatch[0]) {
+      return docMatch[0];
+    }
+    
+    // Extract HTML from markdown just in case it didn't find doctype
+    const htmlMatch = finalCode.match(/```(?:html)?\s*\n([\s\S]*?)```/i);
     if (htmlMatch && htmlMatch[1]) {
         return htmlMatch[1].trim();
     }
     
     // Fallback if no markdown block
-    return text.trim();
+    return finalCode;
   } catch (error) {
     console.error("Failed to generate game code:", error);
     throw error;

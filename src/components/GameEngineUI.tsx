@@ -92,8 +92,23 @@ export function GameEngineUI() {
       .replace(/dirLight\.shadow\.mapSize\.width\s*=/g, '// mapSize.width =')
       .replace(/dirLight\.shadow\.mapSize\.height\s*=/g, '// mapSize.height =');
 
+    // Auto-inject missing libraries if they are used but not imported
+    if (fixedCode.includes('THREE.') && !fixedCode.includes('three.js') && !fixedCode.includes('three.min.js')) {
+      fixedCode = fixedCode.replace('</head>', '  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n</head>');
+    }
+    if (fixedCode.includes('CANNON.') && !fixedCode.includes('cannon.js') && !fixedCode.includes('cannon.min.js')) {
+      fixedCode = fixedCode.replace('</head>', '  <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>\n</head>');
+    }
+    if ((fixedCode.includes('Matter.') || fixedCode.includes('matter.')) && !fixedCode.includes('matter-js') && !fixedCode.includes('matter.min.js')) {
+      fixedCode = fixedCode.replace('</head>', '  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>\n</head>');
+    }
+
     const errorScript = `<script>
       (function() {
+        Object.defineProperty(window, 'matter', {
+          get: function() { return window.Matter; },
+          set: function(v) { window.Matter = v; }
+        });
         const methods = ['log', 'error', 'warn', 'info'];
         methods.forEach(method => {
           const original = console[method];
@@ -123,13 +138,15 @@ export function GameEngineUI() {
       })();
     </script>`;
     
-    if (fixedCode.includes('<head>')) {
-      return fixedCode.replace('<head>', '<head>' + errorScript);
+    if (/(<head>)/i.test(fixedCode)) {
+      return fixedCode.replace(/(<head>)/i, '$1\n' + errorScript);
     }
     return errorScript + fixedCode;
   };
 
   const [homeName, setHomeName] = useState('');
+  const [projectType, setProjectType] = useState<'2D' | '3D'>('3D');
+  const [usePhysics, setUsePhysics] = useState(true);
 
   if (!projectName) {
     return (
@@ -142,7 +159,35 @@ export function GameEngineUI() {
           </div>
           
           <h1 className="text-2xl font-bold text-white mb-2 tracking-tight">NEURACORE</h1>
-          <p className="text-slate-400 text-sm mb-8 text-center">Enter a name for your new project to begin generating.</p>
+          <p className="text-slate-400 text-sm mb-6 text-center">New Project Setup</p>
+
+          <div className="w-full flex gap-2 mb-4">
+            <button 
+              onClick={() => setProjectType('3D')}
+              className={cn("flex-1 py-2 text-sm font-bold rounded border transition-colors", projectType === '3D' ? "bg-indigo-600/20 border-indigo-500 text-indigo-400" : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300")}
+            >
+              3D Engine
+            </button>
+            <button 
+              onClick={() => setProjectType('2D')}
+              className={cn("flex-1 py-2 text-sm font-bold rounded border transition-colors", projectType === '2D' ? "bg-indigo-600/20 border-indigo-500 text-indigo-400" : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300")}
+            >
+              2D Engine
+            </button>
+          </div>
+
+          <label className="w-full flex items-center gap-3 mb-6 bg-slate-800/50 p-3 rounded-lg border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-colors">
+            <input 
+              type="checkbox" 
+              checked={usePhysics}
+              onChange={(e) => setUsePhysics(e.target.checked)}
+              className="w-4 h-4 rounded bg-slate-900 border-slate-600 text-indigo-600 focus:ring-indigo-600 focus:ring-offset-slate-900" 
+            />
+            <div className="flex flex-col">
+               <span className="text-sm font-medium text-slate-200">Enable Physics Engine</span>
+               <span className="text-[10px] text-slate-500">{projectType === '3D' ? 'Includes Cannon.js (Gravity, Collisions)' : 'Includes Matter.js (Rigid bodies)'}</span>
+            </div>
+          </label>
           
           <input 
             type="text" 
@@ -153,13 +198,17 @@ export function GameEngineUI() {
             onKeyDown={e => {
               if (e.key === 'Enter' && homeName.trim()) {
                 setProjectName(homeName.trim());
+                loadTemplate(projectType, usePhysics);
               }
             }}
           />
           
           <button 
             disabled={!homeName.trim()}
-            onClick={() => setProjectName(homeName.trim())}
+            onClick={() => {
+              setProjectName(homeName.trim());
+              loadTemplate(projectType, usePhysics);
+            }}
             className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center shadow-lg"
           >
             Create Project <Play className="w-4 h-4 ml-2" />
@@ -185,8 +234,10 @@ export function GameEngineUI() {
               <span onClick={() => setFileMenuOpen(!fileMenuOpen)} className="hover:text-white cursor-pointer transition-colors flex items-center">File <ChevronDown className="w-3 h-3 ml-1" /></span>
               {fileMenuOpen && (
                 <div className="absolute top-full mt-2 left-0 w-36 bg-slate-900 border border-slate-700 rounded shadow-xl py-1 z-50">
-                  <button onClick={() => { loadTemplate('2D'); setFileMenuOpen(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-600 hover:text-white text-slate-300 transition-colors">New 2D Project</button>
-                  <button onClick={() => { loadTemplate('3D'); setFileMenuOpen(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-600 hover:text-white text-slate-300 transition-colors">New 3D Project</button>
+                  <button onClick={() => { loadTemplate('2D', true); setFileMenuOpen(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-600 hover:text-white text-slate-300 transition-colors">New 2D Project (Physics)</button>
+                  <button onClick={() => { loadTemplate('2D', false); setFileMenuOpen(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-600 hover:text-white text-slate-300 transition-colors">New 2D Project (Basic)</button>
+                  <button onClick={() => { loadTemplate('3D', true); setFileMenuOpen(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-600 hover:text-white text-slate-300 transition-colors border-t border-slate-800 mt-1 pt-1">New 3D Project (Physics)</button>
+                  <button onClick={() => { loadTemplate('3D', false); setFileMenuOpen(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-indigo-600 hover:text-white text-slate-300 transition-colors">New 3D Project (Basic)</button>
                   <button onClick={() => { exportGame(); setFileMenuOpen(false); }} className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-700 text-slate-300 border-t border-slate-800 mt-1 pt-1 flex items-center transition-colors"><Download className="w-3 h-3 mr-1"/> Export HTML</button>
                 </div>
               )}
@@ -206,9 +257,11 @@ export function GameEngineUI() {
                <div className="absolute top-full mt-2 left-0 w-48 bg-slate-900 border border-slate-700 rounded shadow-xl py-1 z-50 flex flex-col">
                   {/* File Items */}
                   <div className="px-3 py-1 font-bold text-slate-500 text-[10px] uppercase">File</div>
-                  <button onClick={() => { loadTemplate('2D'); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300">New 2D Project</button>
-                  <button onClick={() => { loadTemplate('3D'); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300">New 3D Project</button>
-                  <button onClick={() => { exportGame(); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300 flex items-center"><Download className="w-3 h-3 mr-1"/> Export HTML</button>
+                  <button onClick={() => { loadTemplate('2D', true); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300">New 2D (Physics)</button>
+                  <button onClick={() => { loadTemplate('2D', false); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300">New 2D (Basic)</button>
+                  <button onClick={() => { loadTemplate('3D', true); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300 border-t border-slate-800 pt-1 mt-1">New 3D (Physics)</button>
+                  <button onClick={() => { loadTemplate('3D', false); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300">New 3D (Basic)</button>
+                  <button onClick={() => { exportGame(); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300 flex items-center border-t border-slate-800 pt-1 mt-1"><Download className="w-3 h-3 mr-1"/> Export HTML</button>
                   <div className="border-t border-slate-800 my-1"></div>
                   <button onClick={() => { insertPromptFocus('Edit the current script to...'); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300">Edit</button>
                   <button onClick={() => { insertPromptFocus('Add a new asset to the project...'); setMobileMenuOpen(false); }} className="w-full text-left px-4 py-1.5 text-xs hover:bg-slate-800 text-slate-300">Assets</button>

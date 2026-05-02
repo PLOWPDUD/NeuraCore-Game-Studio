@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { DEFAULT_3D_GAME, DEFAULT_2D_GAME } from '../lib/templates';
+import { DEFAULT_3D_GAME, DEFAULT_2D_GAME, DEFAULT_3D_GAME_NO_PHYSICS, DEFAULT_2D_GAME_NO_PHYSICS } from '../lib/templates';
 import { generateGameCode } from '../services/aiService';
 
 export interface Message {
@@ -31,7 +31,7 @@ interface GameEngineState {
   mobileTab: MobileTab;
   setMobileTab: (tab: MobileTab) => void;
   exportGame: () => void;
-  loadTemplate: (type: '2D' | '3D') => void;
+  loadTemplate: (type: '2D' | '3D', usePhysics?: boolean) => void;
   logs: ConsoleLog[];
   addLog: (log: ConsoleLog) => void;
   clearLogs: () => void;
@@ -93,9 +93,15 @@ export function GameEngineProvider({ children }: { children: ReactNode }) {
     URL.revokeObjectURL(url);
   };
 
-  const loadTemplate = (type: '2D' | '3D') => {
-    setCode(type === '2D' ? DEFAULT_2D_GAME : DEFAULT_3D_GAME);
-    setMessages([...messages, { role: 'assistant', content: `Loaded empty ${type} template.` }]);
+  const loadTemplate = (type: '2D' | '3D', usePhysics: boolean = true) => {
+    let newCode = '';
+    if (type === '2D') {
+      newCode = usePhysics ? DEFAULT_2D_GAME : DEFAULT_2D_GAME_NO_PHYSICS;
+    } else {
+      newCode = usePhysics ? DEFAULT_3D_GAME : DEFAULT_3D_GAME_NO_PHYSICS;
+    }
+    setCode(newCode);
+    setMessages([...messages, { role: 'assistant', content: `Loaded empty ${type} template ${usePhysics ? 'with physics' : 'without physics'}.` }]);
     setViewMode('viewport');
     setMobileTab('viewport');
   };
